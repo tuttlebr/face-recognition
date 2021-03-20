@@ -1,19 +1,17 @@
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
+
 import dlib
 from logging import basicConfig, critical, error, warning, info, debug
-import os
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
-from pathlib import Path
+import glob
 import json
 import multiprocessing
-
 from tqdm.auto import tqdm
-from tqdm.contrib.concurrent import process_map
 import datetime
 import tensorflow as tf
-
 tf.get_logger().setLevel("ERROR")
-tf.debugging.set_log_device_placement(True)
+tf.autograph.set_verbosity(0)
+#tf.debugging.set_log_device_placement(True)
 
 
 class FaceDetector:
@@ -35,13 +33,13 @@ class FaceDetector:
 
         self.tf_device = tf_device
         self.tf_gpus = tf.config.list_physical_devices("GPU")
-        debug("Tensorflow CUDA devices available: {}".format(len(self.tf_gpus)))
+        info("Tensorflow CUDA devices available: {}".format(len(self.tf_gpus)))
         tf.config.set_visible_devices([self.tf_gpus[tf_device]], "GPU")
         debug("Using Tensorflow device:{}".format(self.tf_device))
 
         self.dilb_device = dilb_device
         self.dlib_gpus = dlib.cuda.get_num_devices()
-        debug("dlib CUDA devices available: {}".format(self.dlib_gpus))
+        info("dlib CUDA devices available: {}".format(self.dlib_gpus))
         dlib.cuda.set_device(dilb_device)
         debug("Using DLIB device ID: {}".format(dlib.cuda.get_device()))
 
@@ -147,7 +145,7 @@ class FaceDetector:
             self.images.append((image_file, shape))
 
     def cluster_faces(self):
-        self.labels = dlib.chinese_whispers_clustering(self.descriptors, 0.45)
+        self.labels = dlib.chinese_whispers_clustering(self.descriptors, 0.5)
         num_classes = len(set(self.labels))
         info("Number of clusters: {:,}".format(num_classes))
         self.indices = []
@@ -181,39 +179,34 @@ class FaceDetector:
             
 def index_directory(
     directory,
-    formats=('.bmp', '.gif', '.jpeg', '.jpg', '.png'),
-    follow_links=False,
+    formats=('.jpeg', '.jpg', '.png'),
+    follow_links=True,
 ):
     """Make list of all files in the subdirs of `directory`, with their labels.
     Args:
       directory: The target directory (string).
-      formats: Allowlist of file extensions to index (e.g. ".jpg", ".txt").
+      formats: Allowlist of file extensions to index (e.g. ".jpg", ".png").
 
     Returns:
-      tuple (file_paths, labels, class_names).
-        file_paths: list of file paths (strings).
-        labels: list of matching integer labels (same length as file_paths)
-        class_names: names of the classes corresponding to these labels, in order.
+      file_paths: list of file paths (strings).
     """
-    class_names = []
-    for subdir in sorted(os.listdir(directory)):
+    subdirs = []
+    for subdir in sorted(glob.glob(os.path.join(directory, '*'))):
         if os.path.isdir(os.path.join(directory, subdir)):
-            class_names.append(subdir)
-
-    class_indices = dict(zip(class_names, range(len(class_names))))
+            subdirs.append(subdir)
+    subdirs = [i for i in subdirs if not i.startswith('.')]
 
     # Build an index of the files
     # in the different class subfolders.
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
     results = []
     filenames = []
-    for dirpath in (os.path.join(directory, subdir) for subdir in class_names):
+    for dirpath in (subdir for subdir in subdirs):
         results.append(
             pool.apply_async(
-                index_subdirectory, (dirpath, class_indices, follow_links, formats)
+                index_subdirectory, (dirpath, follow_links, formats)
             )
         )
-    labels_list = []
     for res in results:
         partial_filenames = res.get()
         filenames += partial_filenames
@@ -228,31 +221,29 @@ def index_directory(
 def iter_valid_files(directory, follow_links, formats):
     walk = os.walk(directory, followlinks=follow_links)
     for root, _, files in sorted(walk, key=lambda x: x[0]):
-        for fname in sorted(files):
-            if fname.lower().endswith(formats):
-                yield root, fname
+        if not os.path.split(root)[1].startswith("."):
+            for fname in sorted(files):
+                if fname.lower().endswith(formats):
+                    yield root, fname
 
 
-def index_subdirectory(directory, class_indices, follow_links, formats):
+def index_subdirectory(directory, follow_links, formats):
     """Recursively walks directory and list image paths and their class index.
     Arguments:
       directory: string, target directory.
-      class_indices: dict mapping class names to their index.
       follow_links: boolean, whether to recursively follow subdirectories
         (if False, we only list top-level images in `directory`).
       formats: Allowlist of file extensions to index (e.g. ".jpg", ".txt").
     Returns:
-      tuple `(filenames, labels)`. `filenames` is a list of relative file
-        paths, and `labels` is a list of integer labels corresponding to these
+      a list of relative file paths
         files.
     """
     dirname = os.path.basename(directory)
     valid_files = iter_valid_files(directory, follow_links, formats)
-    labels = []
     filenames = []
     for root, fname in valid_files:
         absolute_path = os.path.join(root, fname)
         relative_path = os.path.join(dirname, os.path.relpath(absolute_path, directory))
         filenames.append(relative_path)
-    filenames_trim = [i for i in filenames if r'@' not in i ]
+    filenames_trim = [i for i in filenames if r'@' not in i]
     return filenames_trim
