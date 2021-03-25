@@ -56,9 +56,8 @@ class FaceDetector:
     def load_image_file(self, file_path):
         
         try:
-            with tf.device('/device:CPU:0'):
-                img = tf.io.read_file(file_path)
-                img = tf.image.decode_image(img, channels=3)
+            img = tf.io.read_file(file_path)
+            img = tf.image.decode_image(img, channels=3)
             return img.numpy()
         except:
             return None
@@ -93,7 +92,11 @@ class FaceDetector:
                 face_dict["confidence"] = 0.0
                 face_dict["dets_ltrb"] = [d.left(), d.top(), d.right(), d.bottom()]
             file_dict["face_metadata"].append(face_dict)
-
+            
+        with open(self.dest_file_name, "a") as outfile1:
+            json.dump(file_dict, outfile1)
+            outfile1.write("\n")
+            
         return file_dict
     
     def write_manifest(self):
