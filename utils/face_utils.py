@@ -1,17 +1,14 @@
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
-
+import numpy as np
 import dlib
 from logging import basicConfig, critical, error, warning, info, debug
 import glob
 import json
-import multiprocessing
-from tqdm.auto import tqdm
+from multiprocessing import Pool, cpu_count
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
 import tensorflow as tf
-tf.get_logger().setLevel("ERROR")
-tf.autograph.set_verbosity(0)
-#tf.debugging.set_log_device_placement(True)
+tf.config.experimental.set_visible_devices([], "GPU")
 
 
 class FaceDetector:
@@ -22,27 +19,14 @@ class FaceDetector:
         face_rec_model_path,
         images_root_dir=os.getcwd(),
         debug_level="INFO",
-        dilb_device=0,
-        tf_device=1,
     ):
-
         basicConfig(level=debug_level)
-        debug("dlib BLAS Optimization: {}".format(dlib.DLIB_USE_BLAS))
-        debug("dlib LAPACK Optimization: {}".format(dlib.DLIB_USE_LAPACK))
-        debug("dlib CUDA Optimization: {}".format(dlib.DLIB_USE_CUDA))
-
-        self.tf_device = tf_device
-        self.tf_gpus = tf.config.list_physical_devices("GPU")
-        info("Tensorflow CUDA devices available: {}".format(len(self.tf_gpus)))
-        tf.config.set_visible_devices([self.tf_gpus[tf_device]], "GPU")
-        debug("Using Tensorflow device:{}".format(self.tf_device))
-
-        self.dilb_device = dilb_device
         self.dlib_gpus = dlib.cuda.get_num_devices()
-        info("dlib CUDA devices available: {}".format(self.dlib_gpus))
-        dlib.cuda.set_device(dilb_device)
-        debug("Using DLIB device ID: {}".format(dlib.cuda.get_device()))
-
+        info("dlib BLAS Optimization: {}".format(dlib.DLIB_USE_BLAS))
+        info("dlib LAPACK Optimization: {}".format(dlib.DLIB_USE_LAPACK))
+        info("dlib CUDA Optimization: {}".format(dlib.DLIB_USE_CUDA))
+        info("dlib CUDA Devices: {}".format(self.dlib_gpus))
+        
         self.images_root_dir = images_root_dir
         self.images_file_list = []
 
@@ -70,72 +54,66 @@ class FaceDetector:
         info("Found {:,} images".format(self.n_images))
 
     def load_image_file(self, file_path):
+        
         try:
-            self.current_file = file_path
-            img = tf.io.read_file(file_path)
-            img = tf.image.decode_image(img, channels=3)
+            with tf.device('/device:CPU:0'):
+                img = tf.io.read_file(file_path)
+                img = tf.image.decode_image(img, channels=3)
             return img.numpy()
         except:
             return None
 
     def load_images_batch(self):
-        self.images_array = [
-            self.detect_faces(self.load_image_file(f))
-            for f in tqdm(self.images_file_list, desc="Isolating faces in images...")
-        ]
+        self.manifest = run_apply_async_multiprocessing(self.detect_faces, self.images_file_list)
 
-    def detect_faces(self, img):
-        dlib.cuda.set_device(self.dilb_device)
-        try:
-            self.dets = self.detector(img)
-        except:
-            self.dets = []
-        if len(self.dets) > 0:
-            file_dict = {}
-            file_dict["file_path"] = self.current_file
-            file_dict["face_count"] = len(self.dets)
-            file_dict["face_metadata"] = []
-            face_list = []
-            for k, d in enumerate(self.dets):
-                dets_rr = []
-                dets_cc = []
-                face_dict = {}
-                idx = "face_{}".format(k)
-                face_dict["id"] = idx
-                if self.mmod:
-                    face_dict["confidence"] = d.confidence
-                    face_dict["dets_ltrb"] = [
-                        d.rect.left(),
-                        d.rect.top(),
-                        d.rect.right(),
-                        d.rect.bottom(),
-                    ]
-                else:
-                    # HOG has no confidence measure.
-                    face_dict["confidence"] = 0.0
-                    face_dict["dets_ltrb"] = [d.left(), d.top(), d.right(), d.bottom()]
-                file_dict["face_metadata"].append(face_dict)
+    def detect_faces(self, filename):
+        img = self.load_image_file(filename)
+        file_dict = {}
+        file_dict["file_path"] = filename
+        file_dict["face_metadata"] = []
+        self.dets = self.detector(img)
+        file_dict["face_count"] = len(self.dets)
+        face_list = []
+        for k, d in enumerate(self.dets):
+            dets_rr = []
+            dets_cc = []
+            face_dict = {}
+            idx = "face_{}".format(k)
+            face_dict["id"] = idx
+            if self.mmod:
+                face_dict["confidence"] = d.confidence
+                face_dict["dets_ltrb"] = [
+                    d.rect.left(),
+                    d.rect.top(),
+                    d.rect.right(),
+                    d.rect.bottom(),
+                ]
+            else:
+                # HOG has no confidence measure.
+                face_dict["confidence"] = 0.0
+                face_dict["dets_ltrb"] = [d.left(), d.top(), d.right(), d.bottom()]
+            file_dict["face_metadata"].append(face_dict)
 
-            with open(self.dest_file_name, "a") as outfile1:
+        return file_dict
+    
+    def write_manifest(self):
+        with open(self.dest_file_name, "a") as outfile1:
+            for file_dict in self.manifest:
                 json.dump(file_dict, outfile1)
                 outfile1.write("\n")
 
-    def read_manifest(self, json_file):
-        self.manifest = open(json_file)
+    def read_manifest(self, json_file=None):
+        if json_file:
+            self.manifest = open(json_file)
         self.manifest = [json.loads(i) for i in self.manifest]
 
     def describe_from_manifest(self):
-        [
-            self.describe_face(entry)
-            for entry in tqdm(self.manifest, desc="getting facial descriptions...")
-        ]
+        run_apply_async_multiprocessing(self.describe_face, self.manifest)
 
     def describe_face(self, entry):
         image_file = entry["file_path"]
         img = self.load_image_file(image_file)
-
         for face in entry["face_metadata"]:
-            dlib.cuda.set_device(self.dilb_device)
             l, t, r, b = face["dets_ltrb"]
             d = dlib.rectangle(l, t, r, b)
             shape = self.sp(img, d)
@@ -160,7 +138,7 @@ class FaceDetector:
     def save_cluster_chips(self, root_dir=None, size=224, padding=0.25):
         if not root_dir:
             root_dir = self.images_root_dir
-            
+
         cluster_root_dir = os.path.join(root_dir, "face_chip_clusters")
         self.maybe_make_dir(cluster_root_dir)
 
@@ -176,7 +154,22 @@ class FaceDetector:
             file_path = os.path.join(output_folder_path, "face_" + str(i))
             dlib.save_face_chip(img, shape, file_path, size=224, padding=0.25)
 
-            
+
+def run_apply_async_multiprocessing(func, iterable, processes=int(cpu_count() * 5)):
+    results = []
+    with ThreadPoolExecutor(max_workers=processes) as executor:
+        future_to_iter = {executor.submit(func, i): i for i in iterable}
+        for future in as_completed(future_to_iter):
+            promise = future_to_iter[future]
+            try:
+                data = future.result()
+                results.append(data)
+            except Exception as exc:
+                info('%r generated an exception: %s' % (promise, exc))
+
+    return results
+
+
 def index_directory(
     directory,
     formats=('.jpeg', '.jpg', '.png'),
@@ -186,7 +179,6 @@ def index_directory(
     Args:
       directory: The target directory (string).
       formats: Allowlist of file extensions to index (e.g. ".jpg", ".png").
-
     Returns:
       file_paths: list of file paths (strings).
     """
@@ -198,7 +190,7 @@ def index_directory(
 
     # Build an index of the files
     # in the different class subfolders.
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    pool = Pool()
     results = []
     filenames = []
     for dirpath in (subdir for subdir in subdirs):
@@ -245,5 +237,5 @@ def index_subdirectory(directory, follow_links, formats):
         absolute_path = os.path.join(root, fname)
         relative_path = os.path.join(dirname, os.path.relpath(absolute_path, directory))
         filenames.append(relative_path)
-    filenames_trim = [i for i in filenames if r'@' not in i]
+    filenames_trim = [i for i in filenames if r"@" not in i]
     return filenames_trim
