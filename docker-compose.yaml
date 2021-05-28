@@ -2,29 +2,15 @@ version: "3.3"
 services:
   base:
     image: tuttlebr/face-recognition:00-base-${BUILD_VERSION}
+    volumes:
+      - type: bind
+        source: ${PHOTO_DIR}
+        target: /photos
     build:
       context: app
       dockerfile: Dockerfile
       args:
         - NV_TENSORFLOW_BUILD=${NV_TENSORFLOW_BUILD}
-  model_download:
-    image: tuttlebr/face-recognition:01-pull-models-${BUILD_VERSION}
-    depends_on: 
-      - base
-    build:
-      context: app
-      dockerfile: Dockerfile.pull_models
-      args:
-        - BUILD_VERSION=${BUILD_VERSION}
-  build_dlib:
-    image: tuttlebr/face-recognition:02-build-dlib-${BUILD_VERSION}
-    depends_on: 
-      - model_download
-    build:
-      context: app
-      dockerfile: Dockerfile.build_dlib
-      args:
-        - BUILD_VERSION=${BUILD_VERSION}
         - CORE_COUNT=${CORE_COUNT}
     deploy:
       resources:

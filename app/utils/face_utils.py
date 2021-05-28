@@ -8,6 +8,7 @@ from multiprocessing import Pool, cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
 import tensorflow as tf
+
 tf.config.experimental.set_visible_devices([], "GPU")
 
 
@@ -26,15 +27,19 @@ class FaceDetector:
         info("dlib LAPACK Optimization: {}".format(dlib.DLIB_USE_LAPACK))
         info("dlib CUDA Optimization: {}".format(dlib.DLIB_USE_CUDA))
         info("dlib CUDA Devices: {}".format(self.dlib_gpus))
-        
+
         self.images_root_dir = images_root_dir
         self.images_file_list = []
 
         stamp = str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
-        self.dest_file_name = "face_db_" + stamp + ".json"
+        self.dest_file_name = os.path.join(
+            self.images_root_dir, "face_db_" + stamp + ".json"
+        )
 
         try:
-            self.detector = dlib.cnn_face_detection_model_v1(face_det_model_path)
+            self.detector = dlib.cnn_face_detection_model_v1(
+                face_det_model_path
+            )
             self.mmod = True
             info("Using Convolutional Neural Network method.")
         except:
@@ -54,7 +59,7 @@ class FaceDetector:
         info("Found {:,} images".format(self.n_images))
 
     def load_image_file(self, file_path):
-        
+
         try:
             img = tf.io.read_file(file_path)
             img = tf.image.decode_image(img, channels=3)
@@ -63,19 +68,18 @@ class FaceDetector:
             return None
 
     def load_images_batch(self):
-        self.manifest = run_apply_async_multiprocessing(self.detect_faces, self.images_file_list)
+        self.manifest = run_apply_async_multiprocessing(
+            self.detect_faces, self.images_file_list
+        )
 
     def detect_faces(self, filename):
         img = self.load_image_file(filename)
         file_dict = {}
         file_dict["file_path"] = filename
         file_dict["face_metadata"] = []
-        self.dets = self.detector(img)
+        self.dets = self.detector(img, 1)
         file_dict["face_count"] = len(self.dets)
-        face_list = []
         for k, d in enumerate(self.dets):
-            dets_rr = []
-            dets_cc = []
             face_dict = {}
             idx = "face_{}".format(k)
             face_dict["id"] = idx
@@ -90,15 +94,20 @@ class FaceDetector:
             else:
                 # HOG has no confidence measure.
                 face_dict["confidence"] = 0.0
-                face_dict["dets_ltrb"] = [d.left(), d.top(), d.right(), d.bottom()]
+                face_dict["dets_ltrb"] = [
+                    d.left(),
+                    d.top(),
+                    d.right(),
+                    d.bottom(),
+                ]
             file_dict["face_metadata"].append(face_dict)
-            
+
         with open(self.dest_file_name, "a") as outfile1:
             json.dump(file_dict, outfile1)
             outfile1.write("\n")
-            
+
         return file_dict
-    
+
     def write_manifest(self):
         with open(self.dest_file_name, "a") as outfile1:
             for file_dict in self.manifest:
@@ -158,7 +167,9 @@ class FaceDetector:
             dlib.save_face_chip(img, shape, file_path, size=224, padding=0.25)
 
 
-def run_apply_async_multiprocessing(func, iterable, processes=int(cpu_count() * 5)):
+def run_apply_async_multiprocessing(
+    func, iterable, processes=int(cpu_count() * 5)
+):
     results = []
     with ThreadPoolExecutor(max_workers=processes) as executor:
         future_to_iter = {executor.submit(func, i): i for i in iterable}
@@ -168,14 +179,14 @@ def run_apply_async_multiprocessing(func, iterable, processes=int(cpu_count() * 
                 data = future.result()
                 results.append(data)
             except Exception as exc:
-                info('%r generated an exception: %s' % (promise, exc))
+                info("%r generated an exception: %s" % (promise, exc))
 
     return results
 
 
 def index_directory(
     directory,
-    formats=('.jpeg', '.jpg', '.png'),
+    formats=(".jpeg", ".jpg", ".png"),
     follow_links=True,
 ):
     """Make list of all files in the subdirs of `directory`, with their labels.
@@ -186,10 +197,10 @@ def index_directory(
       file_paths: list of file paths (strings).
     """
     subdirs = []
-    for subdir in sorted(glob.glob(os.path.join(directory, '*'))):
+    for subdir in sorted(glob.glob(os.path.join(directory, "*"))):
         if os.path.isdir(os.path.join(directory, subdir)):
             subdirs.append(subdir)
-    subdirs = [i for i in subdirs if not i.startswith('.')]
+    subdirs = [i for i in subdirs if not i.startswith(".")]
 
     # Build an index of the files
     # in the different class subfolders.
@@ -238,7 +249,9 @@ def index_subdirectory(directory, follow_links, formats):
     filenames = []
     for root, fname in valid_files:
         absolute_path = os.path.join(root, fname)
-        relative_path = os.path.join(dirname, os.path.relpath(absolute_path, directory))
+        relative_path = os.path.join(
+            dirname, os.path.relpath(absolute_path, directory)
+        )
         filenames.append(relative_path)
     filenames_trim = [i for i in filenames if r"@" not in i]
     return filenames_trim

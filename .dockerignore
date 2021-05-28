@@ -1,0 +1,5 @@
+.bashrc
+.conda/
+.config/
+.local/
+notebooks/
