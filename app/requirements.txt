@@ -1,0 +1,8 @@
+progressbar2
+fastapi
+uvicorn[standard]
+gunicorn
+pandas
+ipywidgets
+tensorflow-addons
+matplotlib

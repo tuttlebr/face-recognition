@@ -1,0 +1,6 @@
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+docker system prune -f
+clear
+docker-compose down --rmi all --volumes --remove-orphans
+docker-compose up
