@@ -2,8 +2,8 @@ import os
 
 from utils.face_utils import FaceDetector
 
-models_root_dir = "/models"
-photos_root_dir = "/photos"
+models_root_dir = os.path.join(os.getenv("HOME"), "models")
+photos_root_dir = os.path.join(os.getenv("HOME"), "photos")
 face_det_model_path = os.path.join(
     models_root_dir, "mmod_human_face_detector.dat"
 )
@@ -22,13 +22,8 @@ fd = FaceDetector(
 )
 
 fd.collect_image_file_paths()
-
 fd.load_images_batch()
-
 fd.write_manifest()
-
 fd.describe_from_manifest()
-
 fd.cluster_faces()
-
 fd.save_cluster_chips()

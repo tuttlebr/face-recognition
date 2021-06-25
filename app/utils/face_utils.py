@@ -1,13 +1,19 @@
 import os
 import numpy as np
 import dlib
-from logging import basicConfig, critical, error, warning, info, debug
+from logging import basicConfig, info, debug
 import glob
 import json
 from multiprocessing import Pool, cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
 import tensorflow as tf
+
+import logging
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+logging.getLogger("tensorflow").addHandler(logging.NullHandler(logging.ERROR))
 
 tf.config.experimental.set_visible_devices([], "GPU")
 
@@ -37,6 +43,7 @@ class FaceDetector:
         )
 
         try:
+            info(face_det_model_path)
             self.detector = dlib.cnn_face_detection_model_v1(
                 face_det_model_path
             )
@@ -68,9 +75,10 @@ class FaceDetector:
             return None
 
     def load_images_batch(self):
-        self.manifest = run_apply_async_multiprocessing(
+        list_manifest = run_apply_async_multiprocessing(
             self.detect_faces, self.images_file_list
         )
+        self.manifest = {"manifest": list_manifest}
 
     def detect_faces(self, filename):
         img = self.load_image_file(filename)
@@ -102,17 +110,15 @@ class FaceDetector:
                 ]
             file_dict["face_metadata"].append(face_dict)
 
-        with open(self.dest_file_name, "a") as outfile1:
-            json.dump(file_dict, outfile1)
-            outfile1.write("\n")
+        # with open(self.dest_file_name, "a") as outfile1:
+        #     json.dump(file_dict, outfile1)
+        #     outfile1.write("\n")
 
         return file_dict
 
     def write_manifest(self):
-        with open(self.dest_file_name, "a") as outfile1:
-            for file_dict in self.manifest:
-                json.dump(file_dict, outfile1)
-                outfile1.write("\n")
+        with open(self.dest_file_name, "w") as outfile1:
+            json.dump(self.manifest, outfile1)
 
     def read_manifest(self, json_file=None):
         if json_file:
@@ -168,7 +174,7 @@ class FaceDetector:
 
 
 def run_apply_async_multiprocessing(
-    func, iterable, processes=int(cpu_count() * 5)
+    func, iterable, processes=int(cpu_count() * 32)
 ):
     results = []
     with ThreadPoolExecutor(max_workers=processes) as executor:

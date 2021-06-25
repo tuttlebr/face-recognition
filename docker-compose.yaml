@@ -1,21 +1,22 @@
-version: "3.3"
 services:
-  base:
-    image: tuttlebr/face-recognition:00-base-${BUILD_VERSION}
-    volumes:
-      - type: bind
-        source: ${PHOTO_DIR}
-        target: /photos
+  face-recognition:
     build:
       context: app
       dockerfile: Dockerfile
       args:
         - NV_TENSORFLOW_BUILD=${NV_TENSORFLOW_BUILD}
         - CORE_COUNT=${CORE_COUNT}
+        - USER=${USER}
+    volumes:
+      - type: bind
+        source: ${PHOTO_DIR}
+        target: /home/${USER}/photos
     deploy:
       resources:
         reservations:
           devices:
-          - driver: nvidia
-            count: 1
-            capabilities: [gpu]
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    image: tuttlebr/face-recognition:00-base-${BUILD_VERSION}
+    user: "${UID}:${GID}"

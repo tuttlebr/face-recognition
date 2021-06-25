@@ -1,0 +1,154 @@
+{
+  "manifest": [
+    {
+      "file_path": "/home/brandon/photos/star-trek/tos1.jpg",
+      "face_metadata": [
+        {
+          "id": "face_0",
+          "confidence": 1.1083269119262695,
+          "dets_ltrb": [333, 454, 431, 552]
+        },
+        {
+          "id": "face_1",
+          "confidence": 1.0954331159591675,
+          "dets_ltrb": [313, 86, 411, 184]
+        },
+        {
+          "id": "face_2",
+          "confidence": 1.0853691101074219,
+          "dets_ltrb": [116, 442, 234, 560]
+        },
+        {
+          "id": "face_3",
+          "confidence": 1.0562794208526611,
+          "dets_ltrb": [103, 175, 185, 257]
+        }
+      ],
+      "face_count": 4
+    },
+    {
+      "file_path": "/home/brandon/photos/star-trek/tos0.jpg",
+      "face_metadata": [
+        {
+          "id": "face_0",
+          "confidence": 1.09309720993042,
+          "dets_ltrb": [1206, 134, 1376, 304]
+        },
+        {
+          "id": "face_1",
+          "confidence": 1.0649285316467285,
+          "dets_ltrb": [1476, 326, 1680, 530]
+        },
+        {
+          "id": "face_2",
+          "confidence": 1.0616658926010132,
+          "dets_ltrb": [733, 140, 937, 344]
+        },
+        {
+          "id": "face_3",
+          "confidence": 1.0562567710876465,
+          "dets_ltrb": [501, 82, 671, 252]
+        },
+        {
+          "id": "face_4",
+          "confidence": 1.0511678457260132,
+          "dets_ltrb": [243, 134, 413, 304]
+        },
+        {
+          "id": "face_5",
+          "confidence": 1.0494295358657837,
+          "dets_ltrb": [1825, 254, 1995, 424]
+        }
+      ],
+      "face_count": 6
+    },
+    {
+      "file_path": "/home/brandon/photos/star-trek/tos2.jpg",
+      "face_metadata": [
+        {
+          "id": "face_0",
+          "confidence": 1.0861667394638062,
+          "dets_ltrb": [652, 30, 709, 87]
+        },
+        {
+          "id": "face_1",
+          "confidence": 1.0731183290481567,
+          "dets_ltrb": [395, 45, 442, 93]
+        },
+        {
+          "id": "face_2",
+          "confidence": 1.0694212913513184,
+          "dets_ltrb": [785, 82, 842, 139]
+        },
+        {
+          "id": "face_3",
+          "confidence": 1.067838191986084,
+          "dets_ltrb": [154, 75, 223, 144]
+        },
+        {
+          "id": "face_4",
+          "confidence": 1.0659185647964478,
+          "dets_ltrb": [549, 36, 606, 93]
+        },
+        {
+          "id": "face_5",
+          "confidence": 1.0599623918533325,
+          "dets_ltrb": [424, 193, 492, 261]
+        },
+        {
+          "id": "face_6",
+          "confidence": 1.0539913177490234,
+          "dets_ltrb": [284, 47, 341, 104]
+        }
+      ],
+      "face_count": 7
+    },
+    {
+      "file_path": "/home/brandon/photos/star-trek/tos4.jpg",
+      "face_metadata": [
+        {
+          "id": "face_0",
+          "confidence": 1.0563771724700928,
+          "dets_ltrb": [700, 161, 904, 365]
+        },
+        {
+          "id": "face_1",
+          "confidence": 1.0501389503479004,
+          "dets_ltrb": [335, 269, 476, 411]
+        }
+      ],
+      "face_count": 2
+    },
+    {
+      "file_path": "/home/brandon/photos/star-trek/tos3.jpg",
+      "face_metadata": [
+        {
+          "id": "face_0",
+          "confidence": 1.0785504579544067,
+          "dets_ltrb": [655, 176, 773, 294]
+        },
+        {
+          "id": "face_1",
+          "confidence": 1.0647778511047363,
+          "dets_ltrb": [309, 176, 426, 294]
+        },
+        {
+          "id": "face_2",
+          "confidence": 1.0542553663253784,
+          "dets_ltrb": [523, 173, 621, 271]
+        },
+        {
+          "id": "face_3",
+          "confidence": 1.0439728498458862,
+          "dets_ltrb": [105, 252, 203, 351]
+        },
+        {
+          "id": "face_4",
+          "confidence": 0.7054327130317688,
+          "dets_ltrb": [486, 350, 533, 397]
+        }
+      ],
+      "face_count": 5
+    }
+  ]
+}
